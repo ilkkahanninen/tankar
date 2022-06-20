@@ -1,0 +1,17 @@
+{
+  "name": "chainstore",
+  "version": "0.0.0",
+  "description": "Reliable state management for async world",
+  "keywords": [
+    "react",
+    "state"
+  ],
+  "author": "Ilkka Hänninen <ilkka.hanninen@gmail.com>",
+  "homepage": "",
+  "license": "ISC",
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  }
+}
