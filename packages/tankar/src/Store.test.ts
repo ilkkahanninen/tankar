@@ -121,6 +121,30 @@ describe("Store", () => {
   });
 });
 
+describe("Sync two stores", () => {
+  it("Generate updates to a store from another store with a long running transaction", async () => {
+    const counter = new Store(0);
+    const { store: tensAccumulator, history } = createStore(NaN);
+
+    const bridge = (count: number) => {
+      if (count % 10 === 0) {
+        tensAccumulator.dispatch(() => count);
+      }
+    };
+
+    counter.subscribe(bridge);
+    counter.startTransaction(({ replace }) => {
+      for (let i = 1; i <= 100; i++) {
+        replace(set(i));
+      }
+    });
+
+    await until(() => counter.hasSettled());
+
+    expect(history).toEqual([NaN, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]);
+  });
+});
+
 // Utils
 
 const add = (a: number) =>
@@ -128,7 +152,10 @@ const add = (a: number) =>
     return a + b;
   };
 
-const set = (a: string) => (_: string) => a;
+const set =
+  <T>(a: T) =>
+  (_: T) =>
+    a;
 
 const until = (
   condition: () => boolean,
