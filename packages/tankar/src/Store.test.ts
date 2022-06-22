@@ -2,16 +2,25 @@ import { Store } from "./Store";
 import { TransactionInterface } from "./Transaction";
 
 describe("Store", () => {
-  it("dispatching", () => {
-    const { store, history } = createStore(0);
-    store.dispatch(add(5));
-    store.dispatch(add(3));
-    expect(history).toEqual([0, 5, 8]);
-    console.log(store.history());
+  describe("Dispatching", () => {
+    it("Store state can be updated by dispatching patches", () => {
+      const { store, history } = createStore(0);
+      store.dispatch(add(5));
+      store.dispatch(add(3));
+      expect(history).toEqual([0, 5, 8]);
+    });
+
+    it("Dispatch functions can be declared using a convience function", async () => {
+      const { store, history } = createStore(0);
+      const addCounter = store.dispatchFn(add);
+      addCounter(8);
+      addCounter(-10);
+      expect(history).toEqual([0, 8, -2]);
+    });
   });
 
-  describe("transactions", () => {
-    it("dispatching", async () => {
+  describe("Transactions", () => {
+    it("Updates the state according to the dispatched patches", async () => {
       const { store, history } = createStore(0);
       const { dispatch, done } = await createAsyncWorker(store);
       dispatch(add(5));
@@ -20,11 +29,11 @@ describe("Store", () => {
 
       await until(() => store.hasSettled());
 
-      expect(store.tasks.map((tx) => tx.state)).toEqual(["completed"]);
+      expect(store.transactions.map((tx) => tx.state)).toEqual(["completed"]);
       expect(history).toEqual([0, 5, 7]);
     });
 
-    it("replacing a patch", async () => {
+    it("Calling `replace` during a transaction resets the transaction's changes and starts patching from clean slate", async () => {
       const { store, history } = createStore(0);
       const { dispatch, replace, done } = await createAsyncWorker(store);
       dispatch(add(5));
@@ -33,12 +42,12 @@ describe("Store", () => {
 
       await until(() => store.hasSettled());
 
-      expect(store.tasks.map((tx) => tx.state)).toEqual(["completed"]);
+      expect(store.transactions.map((tx) => tx.state)).toEqual(["completed"]);
       expect(history).toEqual([0, 5, 13]);
     });
 
-    describe("aborting", () => {
-      it("abort from worker code", async () => {
+    describe("Aborting a transaction", () => {
+      it("Aborting transaction inside the worker code", async () => {
         const { store, history } = createStore("initial");
         const { dispatch, abortController } = await createAsyncWorker(store);
         dispatch(set("new value"));
@@ -46,11 +55,11 @@ describe("Store", () => {
 
         await until(() => store.hasSettled());
 
-        expect(store.tasks.map((tx) => tx.state)).toEqual(["aborted"]);
+        expect(store.transactions.map((tx) => tx.state)).toEqual(["aborted"]);
         expect(history).toEqual(["initial", "new value", "initial"]);
       });
 
-      it("abort from returned function", async () => {
+      it("Aborting transaction using the returned abort function", async () => {
         const { store, history } = createStore("initial");
         const { dispatch, abort } = await createAsyncWorker(store);
         dispatch(set("new value"));
@@ -58,7 +67,7 @@ describe("Store", () => {
 
         await until(() => store.hasSettled());
 
-        expect(store.tasks.map((tx) => tx.state)).toEqual(["aborted"]);
+        expect(store.transactions.map((tx) => tx.state)).toEqual(["aborted"]);
         expect(history).toEqual(["initial", "new value", "initial"]);
       });
     });
@@ -134,7 +143,7 @@ const createAsyncWorker = async <T>(store: Store<T>) => {
   let iface: TransactionInterface<T> | null = null;
   let done = false;
 
-  const abort = store.tx(async function asyncWorker(
+  const abort = store.startTransaction(async function asyncWorker(
     i: TransactionInterface<T>
   ) {
     iface = i;

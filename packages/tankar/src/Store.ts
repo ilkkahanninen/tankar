@@ -5,14 +5,16 @@ import {
   Transaction,
   TransactionInterface,
 } from "./Transaction";
+import { ensureArray } from "./utils";
 
 export type TransactionErrorHandler<S> = (error: any) => (state: S) => S;
+export type WorkerFn<T> = (a: TransactionInterface<T>) => Promise<void> | void;
 
 export class Store<S> {
   readonly initialState: S;
   compactedState: S;
   currentState: S;
-  tasks: Array<Transaction<S>>;
+  transactions: Array<Transaction<S>>;
   readonly subscribers: SubscriberList<S>;
   errorHandler: TransactionErrorHandler<S>;
 
@@ -20,7 +22,7 @@ export class Store<S> {
     this.initialState = initialState;
     this.compactedState = initialState;
     this.currentState = initialState;
-    this.tasks = [];
+    this.transactions = [];
     this.subscribers = new SubscriberList();
     this.errorHandler = (error) => (state) => {
       console.error("Unhandler error", error);
@@ -31,17 +33,27 @@ export class Store<S> {
   dispatch(...p: Array<Patch<S>>): Store<S> {
     const task = new Transaction<S>();
     task.complete(p);
-    this.tasks.push(task);
+    this.transactions.push(task);
     this.updateState();
     return this;
   }
 
-  tx(
-    fn: (a: TransactionInterface<S>) => Promise<void> | void
-  ): AbortTransactionFn {
+  dispatchFn<A extends any[]>(fn: (...a: A) => Array<Patch<S>> | Patch<S>) {
+    return (...a: A) => {
+      this.dispatch(...ensureArray(fn(...a)));
+    };
+  }
+
+  startTransaction(worker: WorkerFn<S>): AbortTransactionFn {
     const task = new Transaction<S>();
-    this.tasks.push(task);
-    return task.run(fn, this.updateState.bind(this));
+    this.transactions.push(task);
+    return task.run(worker, this.updateState.bind(this));
+  }
+
+  transactionFn<A extends any[]>(fn: (...a: A) => WorkerFn<S>) {
+    return async (...a: A) => {
+      this.startTransaction(fn(...a));
+    };
   }
 
   handleErrors(errorHandler: TransactionErrorHandler<S>): Store<S> {
@@ -51,7 +63,7 @@ export class Store<S> {
 
   updateState(): Store<S> {
     this.subscribers.emit(
-      this.tasks.reduce(
+      this.transactions.reduce(
         (state, task) =>
           task.state === "running" || task.state === "completed"
             ? task.reduce(state)
@@ -69,7 +81,7 @@ export class Store<S> {
     let compactedState = this.compactedState;
 
     let compacting = true;
-    for (let tx of this.tasks) {
+    for (let tx of this.transactions) {
       if (!compacting || tx.state === "pending" || tx.state === "running") {
         compacting = false;
         compactedTx.push(tx);
@@ -79,18 +91,18 @@ export class Store<S> {
     }
 
     this.compactedState = compactedState;
-    this.tasks = compactedTx;
+    this.transactions = compactedTx;
     return this;
   }
 
   hasSettled(): boolean {
-    return this.tasks.every(
+    return this.transactions.every(
       (tx) => tx.state !== "pending" && tx.state !== "running"
     );
   }
 
   history() {
-    return this.tasks.map(
+    return this.transactions.map(
       (tx) =>
         `[${tx.state}] ${tx.name}: ${tx.patches
           .map((p) => p.name || p.toString())
