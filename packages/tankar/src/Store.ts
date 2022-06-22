@@ -51,9 +51,9 @@ export class Store<S> {
   }
 
   startTransaction(worker: WorkerFn<S>): AbortTransactionFn {
-    const task = new Transaction<S>();
-    this.push(task);
-    return task.run(worker, this.updateState.bind(this));
+    const transaction = new Transaction<S>();
+    this.push(transaction);
+    return transaction.run(worker, this.updateState.bind(this));
   }
 
   transactionFn<A extends any[]>(fn: (...a: A) => WorkerFn<S>) {
@@ -118,11 +118,11 @@ export class Store<S> {
     initialState: S
   ): S {
     return transactions.reduce(
-      (state, task) =>
-        task.state === "running" || task.state === "completed"
-          ? task.reduce(state)
-          : task.state === "thrown"
-          ? this.errorHandler(task.error)(state)
+      (state, transaction) =>
+        transaction.state === "running" || transaction.state === "completed"
+          ? transaction.reduce(state)
+          : transaction.state === "thrown"
+          ? this.errorHandler(transaction.error)(state)
           : state,
       initialState
     );
