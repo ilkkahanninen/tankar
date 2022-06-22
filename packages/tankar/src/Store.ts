@@ -1,3 +1,4 @@
+import { Config, defaultConfig } from "./config";
 import { Subscriber, SubscriberList } from "./SubscriberList";
 import {
   AbortTransactionFn,
@@ -5,7 +6,12 @@ import {
   Transaction,
   TransactionInterface,
 } from "./Transaction";
-import { ensureArray } from "./utils";
+import {
+  ensureArray,
+  recursiveMerge,
+  RecursivePartial,
+  splitWhen,
+} from "./utils";
 
 export type TransactionErrorHandler<S> = (error: any) => (state: S) => S;
 export type WorkerFn<T> = (a: TransactionInterface<T>) => Promise<void> | void;
@@ -17,8 +23,10 @@ export class Store<S> {
   transactions: Array<Transaction<S>>;
   readonly subscribers: SubscriberList<S>;
   errorHandler: TransactionErrorHandler<S>;
+  readonly config: Config;
 
-  constructor(initialState: S) {
+  constructor(initialState: S, config: RecursivePartial<Config> = {}) {
+    this.config = recursiveMerge(defaultConfig, config);
     this.initialState = initialState;
     this.compactedState = initialState;
     this.currentState = initialState;
@@ -31,9 +39,7 @@ export class Store<S> {
   }
 
   dispatch(...p: Array<Patch<S>>): Store<S> {
-    const task = new Transaction<S>();
-    task.complete(p);
-    this.transactions.push(task);
+    this.push(new Transaction<S>().complete(p));
     this.updateState();
     return this;
   }
@@ -46,7 +52,7 @@ export class Store<S> {
 
   startTransaction(worker: WorkerFn<S>): AbortTransactionFn {
     const task = new Transaction<S>();
-    this.transactions.push(task);
+    this.push(task);
     return task.run(worker, this.updateState.bind(this));
   }
 
@@ -63,35 +69,21 @@ export class Store<S> {
 
   updateState(): Store<S> {
     this.subscribers.emit(
-      this.transactions.reduce(
-        (state, task) =>
-          task.state === "running" || task.state === "completed"
-            ? task.reduce(state)
-            : task.state === "thrown"
-            ? this.errorHandler(task.error)(state)
-            : state,
-        this.initialState
-      )
+      this.computeState(this.transactions, this.compactedState)
     );
     return this;
   }
 
   compact(): Store<S> {
-    let compactedTx: Array<Transaction<S>> = [];
-    let compactedState = this.compactedState;
-
-    let compacting = true;
-    for (let tx of this.transactions) {
-      if (!compacting || tx.state === "pending" || tx.state === "running") {
-        compacting = false;
-        compactedTx.push(tx);
-      } else {
-        compactedState = tx.reduce(compactedState);
-      }
-    }
-
-    this.compactedState = compactedState;
-    this.transactions = compactedTx;
+    const [compactableTxs, restOfTxs] = splitWhen(
+      (tx) => tx.state === "pending" || tx.state === "running",
+      this.transactions
+    );
+    this.compactedState = this.computeState(
+      compactableTxs,
+      this.compactedState
+    );
+    this.transactions = restOfTxs;
     return this;
   }
 
@@ -118,6 +110,30 @@ export class Store<S> {
 
   unsubscribe(subscriber: Subscriber<S>): Store<S> {
     this.subscribers.remove(subscriber);
+    return this;
+  }
+
+  private computeState(
+    transactions: Array<Transaction<S>>,
+    initialState: S
+  ): S {
+    return transactions.reduce(
+      (state, task) =>
+        task.state === "running" || task.state === "completed"
+          ? task.reduce(state)
+          : task.state === "thrown"
+          ? this.errorHandler(task.error)(state)
+          : state,
+      initialState
+    );
+  }
+
+  private push(tx: Transaction<S>): Store<S> {
+    this.transactions.push(tx);
+    const cfg = this.config.compact;
+    if (cfg.enabled && cfg.transactionLimit <= this.transactions.length) {
+      this.compact();
+    }
     return this;
   }
 }

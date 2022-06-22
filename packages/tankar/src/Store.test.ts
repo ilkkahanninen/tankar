@@ -1,5 +1,7 @@
+import { Config } from "./config";
 import { Store } from "./Store";
 import { TransactionInterface } from "./Transaction";
+import { RecursivePartial } from "./utils";
 
 describe("Store", () => {
   describe("Dispatching", () => {
@@ -72,6 +74,51 @@ describe("Store", () => {
       });
     });
   });
+
+  describe("State reliability", () => {
+    it("Keeps history correct before and after compaction ", async () => {
+      const { store, history } = createStore("Initial");
+      const { dispatch, done } = await createAsyncWorker(store);
+
+      dispatch(set("Transaction started"));
+      store.dispatch(set("Patched"));
+      dispatch(set("Transaction ended"));
+
+      expect(history).toEqual([
+        "Initial",
+        "Transaction started",
+        "Patched",
+        "Patched", // "Patched" is newer than async worker in the transaction list
+      ]);
+
+      expect(store.compactedState).toEqual("Initial");
+      expect(store.transactions.length).toEqual(2);
+
+      // The state will not compact yet because the async worker is still running
+      store.compact();
+      expect(store.transactions.length).toEqual(2);
+
+      // Complete worker, the state should compact to empty transaction list
+      await done();
+      store.compact();
+      expect(store.transactions).toEqual([]);
+      expect(store.compactedState).toEqual("Patched");
+    });
+  });
+
+  it("Compacts state automatically", () => {
+    const { store, history } = createStore(0, {
+      compact: { transactionLimit: 5 },
+    });
+
+    for (let i = 0; i < 8; i++) {
+      store.dispatch(add(1));
+    }
+
+    expect(history).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(store.compactedState).toEqual(5);
+    expect(store.transactions.length).toEqual(3);
+  });
 });
 
 // Utils
@@ -82,28 +129,6 @@ const add = (a: number) =>
   };
 
 const set = (a: string) => (_: string) => a;
-
-const eventually = async <T>(
-  test: () => T,
-  timeoutMs: number = 100
-): Promise<T | null> => {
-  let result: T | null = null;
-  let error: any;
-  try {
-    await until(() => {
-      try {
-        result = test();
-        return true;
-      } catch (e) {
-        error = e;
-        return false;
-      }
-    }, timeoutMs);
-  } catch (e) {
-    throw error || e;
-  }
-  return result;
-};
 
 const until = (
   condition: () => boolean,
@@ -125,9 +150,9 @@ const until = (
     testCondition();
   });
 
-const createStore = <T>(initial: T) => {
+const createStore = <T>(initial: T, config: RecursivePartial<Config> = {}) => {
   const { subscriber, history } = createTestSubscriber<T>();
-  const store = new Store(initial).subscribe(subscriber);
+  const store = new Store(initial, config).subscribe(subscriber);
   return { store, history };
 };
 
@@ -142,6 +167,7 @@ const createTestSubscriber = <T>() => {
 const createAsyncWorker = async <T>(store: Store<T>) => {
   let iface: TransactionInterface<T> | null = null;
   let done = false;
+  let completed = false;
 
   const abort = store.startTransaction(async function asyncWorker(
     i: TransactionInterface<T>
@@ -151,14 +177,16 @@ const createAsyncWorker = async <T>(store: Store<T>) => {
       done = true;
     });
     await until(() => done);
+    completed = true;
   });
 
   await until(() => iface !== null);
   return {
     ...iface!,
     abort,
-    done: () => {
+    done: async () => {
       done = true;
+      await until(() => completed);
     },
   };
 };

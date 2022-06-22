@@ -91,10 +91,11 @@ export class Transaction<S> {
     };
   }
 
-  complete(patches: Array<Patch<S>> = []): void {
+  complete(patches: Array<Patch<S>> = []): Transaction<S> {
     this.state = "completed";
     this.patches = patches;
     this.name = "patch";
+    return this;
   }
 
   reduce(state: S): S {
