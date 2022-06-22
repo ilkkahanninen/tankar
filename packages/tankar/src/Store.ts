@@ -104,7 +104,7 @@ export class Store<S> {
 
   subscribe(subscriber: Subscriber<S>): Store<S> {
     this.subscribers.push(subscriber);
-    subscriber(this.initialState);
+    subscriber(this.compactedState);
     return this;
   }
 
