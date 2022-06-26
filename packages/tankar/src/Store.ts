@@ -39,8 +39,11 @@ export class Store<S> {
   }
 
   dispatch(...p: Array<Patch<S>>): Store<S> {
-    this.push(new Transaction<S>().complete(p));
-    this.updateState();
+    const transaction = new Transaction<S>().complete(p);
+    this.push(transaction);
+    this.currentState = this.computeState([transaction], this.currentState);
+    this.subscribers.emit(this.currentState);
+    this.compact();
     return this;
   }
 
@@ -53,7 +56,12 @@ export class Store<S> {
   startTransaction(worker: WorkerFn<S>): AbortTransactionFn {
     const transaction = new Transaction<S>();
     this.push(transaction);
-    return transaction.run(worker, this.updateState.bind(this));
+    return transaction.run(worker, () => {
+      this.updateState();
+      if (transaction.hasSettled()) {
+        this.compact();
+      }
+    });
   }
 
   transactionFn<A extends any[]>(fn: (...a: A) => WorkerFn<S>) {
@@ -76,7 +84,7 @@ export class Store<S> {
 
   compact(): Store<S> {
     const [compactableTxs, restOfTxs] = splitWhen(
-      (tx) => tx.state === "pending" || tx.state === "running",
+      (tx) => !tx.hasSettled(),
       this.transactions
     );
     this.compactedState = this.computeState(
@@ -88,9 +96,7 @@ export class Store<S> {
   }
 
   hasSettled(): boolean {
-    return this.transactions.every(
-      (tx) => tx.state !== "pending" && tx.state !== "running"
-    );
+    return this.transactions.every((tx) => tx.hasSettled());
   }
 
   history() {
@@ -130,10 +136,6 @@ export class Store<S> {
 
   private push(tx: Transaction<S>): Store<S> {
     this.transactions.push(tx);
-    const cfg = this.config.compact;
-    if (cfg.enabled && cfg.transactionLimit <= this.transactions.length) {
-      this.compact();
-    }
     return this;
   }
 }

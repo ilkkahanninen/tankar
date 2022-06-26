@@ -57,7 +57,7 @@ describe("Store", () => {
 
         await until(() => store.hasSettled());
 
-        expect(store.transactions.map((tx) => tx.state)).toEqual(["aborted"]);
+        expect(store.transactions.map((tx) => tx.state)).toEqual([]);
         expect(history).toEqual(["initial", "new value", "initial"]);
       });
 
@@ -69,7 +69,7 @@ describe("Store", () => {
 
         await until(() => store.hasSettled());
 
-        expect(store.transactions.map((tx) => tx.state)).toEqual(["aborted"]);
+        expect(store.transactions.map((tx) => tx.state)).toEqual([]);
         expect(history).toEqual(["initial", "new value", "initial"]);
       });
     });
@@ -107,17 +107,15 @@ describe("Store", () => {
   });
 
   it("Compacts state automatically", () => {
-    const { store, history } = createStore(0, {
-      compact: { transactionLimit: 5 },
-    });
+    const { store, history } = createStore(0);
 
     for (let i = 0; i < 8; i++) {
       store.dispatch(add(1));
     }
 
     expect(history).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
-    expect(store.compactedState).toEqual(5);
-    expect(store.transactions.length).toEqual(3);
+    expect(store.compactedState).toEqual(8);
+    expect(store.transactions.length).toEqual(0);
   });
 });
 

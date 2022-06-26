@@ -101,4 +101,8 @@ export class Transaction<S> {
   reduce(state: S): S {
     return this.patches.reduce((prevState, patch) => patch(prevState), state);
   }
+
+  hasSettled(): boolean {
+    return this.state !== "pending" && this.state !== "running";
+  }
 }
