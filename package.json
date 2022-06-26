@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "test": "lerna run test",
-    "postinstall": "lerna bootstrap"
+    "postinstall": "lerna bootstrap",
+    "build": "lerna run build"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^5.16.4",
@@ -14,6 +15,7 @@
     "jest": "^28.1.1",
     "jest-environment-jsdom": "^28.1.1",
     "lerna": "^5.1.4",
+    "nx": "^14.3.6",
     "prettier": "^2.6.2",
     "react-dom": "^18.2.0",
     "ts-jest": "^28.0.5",
