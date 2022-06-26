@@ -1,8 +1,8 @@
 import "@testing-library/jest-dom";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import React from "react";
+import { Store } from "tankar";
 import { useStore } from ".";
-import { Store } from "../../tankar/lib";
 
 describe("chainstore-react", () => {
   it("Initializes", () => {
@@ -45,7 +45,7 @@ const initTestApp = () => {
   });
 
   const loadNumber = () =>
-    store.tx(async () => {
+    store.startTransaction(async () => {
       store.dispatch(() => NaN);
       const number = await numberLoading;
       store.dispatch(() => number);

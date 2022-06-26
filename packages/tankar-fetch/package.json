@@ -1,0 +1,35 @@
+{
+  "name": "tankar-fetch",
+  "version": "0.0.0",
+  "description": "Consolidated resource fetching for Tankar state management library",
+  "keywords": [
+    "tankar",
+    "fetch",
+    "api"
+  ],
+  "author": "Ilkka Hänninen <ilkka.hanninen@gmail.com>",
+  "homepage": "https://github.com/ilkkahanninen/tankar#readme",
+  "license": "ISC",
+  "main": "lib/tankar-fetch.js",
+  "directories": {
+    "lib": "lib",
+    "test": "__tests__"
+  },
+  "files": [
+    "lib"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ilkkahanninen/tankar.git"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"Error: run tests from root\" && exit 1"
+  },
+  "bugs": {
+    "url": "https://github.com/ilkkahanninen/tankar/issues"
+  },
+  "dependencies": {
+    "tankar": "*"
+  }
+}
