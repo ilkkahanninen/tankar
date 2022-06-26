@@ -1,8 +1,6 @@
-const config = {
+module.exports = {
   testEnvironment: "jsdom",
   transform: {
     "^.+\\.tsx?$": "ts-jest",
   },
 };
-
-export default config;
