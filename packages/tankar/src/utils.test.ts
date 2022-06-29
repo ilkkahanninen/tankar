@@ -1,4 +1,10 @@
-import { recursiveMerge, RecursivePartial, splitWhen } from "./utils";
+import {
+  debounce,
+  recursiveMerge,
+  RecursivePartial,
+  splitWhen,
+  tick,
+} from "./utils";
 
 describe("Utils", () => {
   it("recursiveMerge works", () => {
@@ -47,6 +53,20 @@ describe("Utils", () => {
     });
     it("splits at end", () => {
       expect(splitWhen((n) => false, arr)).toEqual([[0, 1, 2, 3, 4], []]);
+    });
+  });
+
+  describe("debounce", () => {
+    it("works", async () => {
+      const arr: number[] = [];
+      const pushNumber = debounce(0, (n: number) => arr.push(n));
+
+      pushNumber(0);
+      pushNumber(1);
+      pushNumber(2);
+
+      await tick();
+      expect(arr).toEqual([2]);
     });
   });
 });

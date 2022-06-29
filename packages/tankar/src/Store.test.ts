@@ -1,4 +1,5 @@
 import { Config } from "./config";
+import { Deferred } from "./Deferred";
 import { Store } from "./Store";
 import { TransactionInterface } from "./Transaction";
 import { RecursivePartial } from "./utils";
@@ -31,7 +32,6 @@ describe("Store", () => {
 
       await until(() => store.hasSettled());
 
-      expect(store.transactions.map((tx) => tx.state)).toEqual(["completed"]);
       expect(history).toEqual([0, 5, 7]);
     });
 
@@ -44,7 +44,6 @@ describe("Store", () => {
 
       await until(() => store.hasSettled());
 
-      expect(store.transactions.map((tx) => tx.state)).toEqual(["completed"]);
       expect(history).toEqual([0, 5, 13]);
     });
 
@@ -73,6 +72,39 @@ describe("Store", () => {
         expect(history).toEqual(["initial", "new value", "initial"]);
       });
     });
+
+    describe("Requesting the store state inside a worker", () => {
+      it("Requesting prior settled state", async () => {
+        const { store, history } = createStore("initial");
+
+        const longProcess = new Deferred();
+        store.startTransaction(async ({ dispatch }) => {
+          dispatch(set("started"));
+          await longProcess.promise;
+          dispatch(set("completed"));
+        });
+
+        const waiting = new Deferred();
+        store.startTransaction(async ({ dispatch, settledState }) => {
+          dispatch(set("waiting"));
+          waiting.resolve();
+          const state = await settledState; // Tää ei nyt etene tästä, tutki mikä vikana.... :---(
+          dispatch(set(`got state: ${state}`));
+        });
+
+        await waiting.promise;
+        longProcess.resolve();
+        await until(() => store.hasSettled());
+
+        expect(history).toEqual([
+          "initial",
+          "started", // First worker: dispatch(set("started"));
+          "waiting", // Second worker: dispatch(set("waiting"));
+          "waiting", // First worker: dispatch(set("completed"));
+          "got state: completed", // Second worker: dispatch(set(`got state: ${state}`));
+        ]);
+      });
+    });
   });
 
   describe("State reliability", () => {
@@ -91,7 +123,7 @@ describe("Store", () => {
         "Patched", // "Patched" is newer than async worker in the transaction list
       ]);
 
-      expect(store.compactedState).toEqual("Initial");
+      expect(store.settledState).toEqual("Initial");
       expect(store.transactions.length).toEqual(2);
 
       // The state will not compact yet because the async worker is still running
@@ -102,7 +134,7 @@ describe("Store", () => {
       await done();
       store.compact();
       expect(store.transactions).toEqual([]);
-      expect(store.compactedState).toEqual("Patched");
+      expect(store.settledState).toEqual("Patched");
     });
   });
 
@@ -114,7 +146,7 @@ describe("Store", () => {
     }
 
     expect(history).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
-    expect(store.compactedState).toEqual(8);
+    expect(store.settledState).toEqual(8);
     expect(store.transactions.length).toEqual(0);
   });
 });

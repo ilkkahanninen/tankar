@@ -7,6 +7,7 @@ import {
   TransactionInterface,
 } from "./Transaction";
 import {
+  debounce,
   ensureArray,
   recursiveMerge,
   RecursivePartial,
@@ -18,7 +19,7 @@ export type WorkerFn<T> = (a: TransactionInterface<T>) => Promise<void> | void;
 
 export class Store<S> {
   readonly initialState: S;
-  compactedState: S;
+  settledState: S;
   currentState: S;
   transactions: Array<Transaction<S>>;
   readonly subscribers: SubscriberList<S>;
@@ -28,7 +29,7 @@ export class Store<S> {
   constructor(initialState: S, config: RecursivePartial<Config> = {}) {
     this.config = recursiveMerge(defaultConfig, config);
     this.initialState = initialState;
-    this.compactedState = initialState;
+    this.settledState = initialState;
     this.currentState = initialState;
     this.transactions = [];
     this.subscribers = new SubscriberList();
@@ -56,12 +57,11 @@ export class Store<S> {
   startTransaction(worker: WorkerFn<S>): AbortTransactionFn {
     const transaction = new Transaction<S>();
     this.push(transaction);
-    return transaction.run(worker, () => {
-      this.updateState();
-      if (transaction.hasSettled()) {
-        this.compact();
-      }
-    });
+    return transaction.run(
+      worker,
+      () => this.updateState(),
+      () => this.deferCompact()
+    );
   }
 
   transactionFn<A extends any[]>(fn: (...a: A) => WorkerFn<S>) {
@@ -77,7 +77,7 @@ export class Store<S> {
 
   updateState(): Store<S> {
     this.subscribers.emit(
-      this.computeState(this.transactions, this.compactedState)
+      this.computeState(this.transactions, this.settledState)
     );
     return this;
   }
@@ -87,21 +87,19 @@ export class Store<S> {
       (tx) => !tx.hasSettled(),
       this.transactions
     );
-    this.compactedState = this.computeState(
-      compactableTxs,
-      this.compactedState
-    );
+    this.settledState = this.computeState(compactableTxs, this.settledState);
     this.transactions = restOfTxs;
+    this.transactions[0]?.setSettledState(this.settledState);
     return this;
   }
 
   hasSettled(): boolean {
-    return this.transactions.every((tx) => tx.hasSettled());
+    return this.transactions.length === 0 && !this.deferCompact.isPending();
   }
 
   subscribe(subscriber: Subscriber<S>): Store<S> {
     this.subscribers.push(subscriber);
-    subscriber(this.compactedState);
+    subscriber(this.settledState);
     return this;
   }
 
@@ -129,4 +127,6 @@ export class Store<S> {
     this.transactions.push(tx);
     return this;
   }
+
+  private deferCompact = debounce(0, () => this.compact());
 }

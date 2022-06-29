@@ -36,3 +36,31 @@ export function splitWhen<T>(
   const index = ts.findIndex(condition);
   return index >= 0 ? [ts.slice(0, index), ts.slice(index)] : [ts, []];
 }
+
+export type DeferId = ReturnType<typeof setTimeout>;
+export const defer = (fn: () => void): DeferId => setTimeout(fn, 0);
+
+export type DebouncedFn<A extends any[]> = {
+  (...a: A): void;
+  isPending: () => boolean;
+};
+
+export function debounce<A extends any[], T>(
+  delayMs: number,
+  fn: (...a: A) => void
+): DebouncedFn<A> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  function debounced(...a: A) {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      fn(...a), delayMs;
+      timer = undefined;
+    });
+  }
+  debounced.isPending = () => timer !== undefined;
+  return debounced;
+}
+
+export function tick(): Promise<void> {
+  return new Promise((resolve) => defer(resolve));
+}

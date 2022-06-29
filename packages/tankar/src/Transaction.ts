@@ -1,7 +1,11 @@
+import { Deferred } from "./Deferred";
+import { defer } from "./utils";
+
 export type TransactionInterface<S> = {
   dispatch: (...fs: Patch<S>[]) => void;
   replace: (...fs: Patch<S>[]) => void;
   abortController: AbortController;
+  settledState: Promise<S>;
 };
 
 export type Patch<S> = (prevState: S) => S;
@@ -29,14 +33,20 @@ export class Transaction<S> {
   patches: Array<Patch<S>>;
   error: any;
   name?: string;
+  private settledState: Deferred<S>;
 
   constructor() {
     this.state = "pending";
     this.patches = [];
     this.name = undefined;
+    this.settledState = new Deferred<S>();
   }
 
-  run(work: Worker<S>, onUpdate: () => void): AbortTransactionFn {
+  run(
+    work: Worker<S>,
+    onUpdate: () => void,
+    onEnd: () => void
+  ): AbortTransactionFn {
     const abortController = new AbortController();
     this.name = work.name || "anonymous";
 
@@ -58,7 +68,7 @@ export class Transaction<S> {
       onUpdate();
     });
 
-    setTimeout(async () => {
+    defer(async () => {
       if (self.state === "aborted") {
         return;
       }
@@ -72,6 +82,7 @@ export class Transaction<S> {
             self.patches = p;
           }),
           abortController,
+          settledState: this.settledState.promise,
         });
         // @ts-ignore
         if (self.state !== "aborted") {
@@ -82,7 +93,8 @@ export class Transaction<S> {
         self.error = err;
         onUpdate();
       }
-    }, 0);
+      onEnd();
+    });
 
     return () => {
       if (this.state === "pending" || this.state === "running") {
@@ -104,5 +116,9 @@ export class Transaction<S> {
 
   hasSettled(): boolean {
     return this.state !== "pending" && this.state !== "running";
+  }
+
+  setSettledState(state: S) {
+    this.settledState.resolve(state);
   }
 }
