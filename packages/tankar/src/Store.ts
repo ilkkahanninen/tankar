@@ -99,15 +99,6 @@ export class Store<S> {
     return this.transactions.every((tx) => tx.hasSettled());
   }
 
-  history() {
-    return this.transactions.map(
-      (tx) =>
-        `[${tx.state}] ${tx.name}: ${tx.patches
-          .map((p) => p.name || p.toString())
-          .join(" >> ")}`
-    );
-  }
-
   subscribe(subscriber: Subscriber<S>): Store<S> {
     this.subscribers.push(subscriber);
     subscriber(this.compactedState);
