@@ -191,27 +191,30 @@ const createTestSubscriber = <T>() => {
 
 const createAsyncWorker = async <T>(store: Store<T>) => {
   let iface: TransactionInterface<T> | null = null;
-  let done = false;
-  let completed = false;
+  const txInitialized = new Deferred();
+  const txCanFinish = new Deferred();
+  const txHasFinished = new Deferred();
 
   const abort = store.startTransaction(async function asyncWorker(
     i: TransactionInterface<T>
   ) {
     iface = i;
     i.abortController.signal.addEventListener("abort", () => {
-      done = true;
+      txCanFinish.resolve();
     });
-    await until(() => done);
-    completed = true;
+    txInitialized.resolve();
+    await txCanFinish.promise;
+    txHasFinished.resolve();
   });
 
-  await until(() => iface !== null);
+  await txInitialized.promise;
+
   return {
     ...iface!,
     abort,
     done: async () => {
-      done = true;
-      await until(() => completed);
+      txCanFinish.resolve();
+      await txHasFinished.promise;
     },
   };
 };
