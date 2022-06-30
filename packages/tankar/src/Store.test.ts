@@ -78,14 +78,14 @@ describe("Store", () => {
         const { store, history } = createStore("initial");
 
         const longProcess = new Deferred();
-        store.startTransaction(async ({ dispatch }) => {
+        store.run(async ({ dispatch }) => {
           dispatch(set("started"));
           await longProcess.promise;
           dispatch(set("completed"));
         });
 
         const waiting = new Deferred();
-        store.startTransaction(async ({ dispatch, settledState }) => {
+        store.run(async ({ dispatch, settledState }) => {
           dispatch(set("waiting"));
           waiting.resolve();
           const state = await settledState;
@@ -163,7 +163,7 @@ describe("Sync two stores", () => {
     };
 
     counter.subscribe(bridge);
-    counter.startTransaction(({ replace }) => {
+    counter.run(({ replace }) => {
       for (let i = 1; i <= 100; i++) {
         replace(set(i));
       }
@@ -227,7 +227,7 @@ const createAsyncWorker = async <T>(store: Store<T>) => {
   const txCanFinish = new Deferred();
   const txHasFinished = new Deferred();
 
-  const abort = store.startTransaction(async function asyncWorker(
+  const abort = store.run(async function asyncWorker(
     i: TransactionInterface<T>
   ) {
     iface = i;

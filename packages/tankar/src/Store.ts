@@ -54,7 +54,7 @@ export class Store<S> {
     };
   }
 
-  startTransaction(worker: WorkerFn<S>): AbortTransactionFn {
+  run(worker: WorkerFn<S>): AbortTransactionFn {
     const transaction = new Transaction<S>();
     this.push(transaction);
     return transaction.run(
@@ -66,7 +66,7 @@ export class Store<S> {
 
   transactionFn<A extends any[]>(fn: (...a: A) => WorkerFn<S>) {
     return async (...a: A) => {
-      this.startTransaction(fn(...a));
+      this.run(fn(...a));
     };
   }
 

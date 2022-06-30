@@ -45,7 +45,7 @@ const initTestApp = () => {
   });
 
   const loadNumber = () =>
-    store.startTransaction(async () => {
+    store.run(async () => {
       store.dispatch(() => NaN);
       const number = await numberLoading;
       store.dispatch(() => number);
