@@ -1,9 +1,12 @@
 {
   "name": "root",
   "private": true,
+  "engines": {
+    "node": "16.15.1",
+    "npm": "8.13.2"
+  },
   "scripts": {
     "test": "lerna run test",
-    "postinstall": "lerna bootstrap",
     "build": "lerna run build"
   },
   "devDependencies": {
