@@ -88,7 +88,7 @@ describe("Store", () => {
         store.startTransaction(async ({ dispatch, settledState }) => {
           dispatch(set("waiting"));
           waiting.resolve();
-          const state = await settledState; // Tää ei nyt etene tästä, tutki mikä vikana.... :---(
+          const state = await settledState;
           dispatch(set(`got state: ${state}`));
         });
 
