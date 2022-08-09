@@ -1,6 +1,7 @@
 import {
   AbortedResource,
   CompleteResource,
+  emptyResource,
   FailedResource,
   LoadingResource,
   NilResource,
@@ -29,8 +30,11 @@ export type CompleteFetchResource<T> = CompleteResource<FetchKind, T>;
 export type FailedFetchResource<E> = FailedResource<FetchKind, E>;
 export type AbortedFetchResource = AbortedResource<FetchKind>;
 
+export const emptyFetchResource: NilFetchResource = emptyResource("fetch");
+
 export const fetchResource = <T, E>(
-  request: Request,
+  input: RequestInfo | URL,
+  init?: RequestInit,
   responseResolver: (resp: Response) => Promise<T> = jsonResolver,
   errorResponseResolver: (resp: Response) => Promise<E> = jsonResolver
 ) =>
@@ -38,8 +42,8 @@ export const fetchResource = <T, E>(
     FetchKind,
     async ({ reject, abortController }) => {
       try {
-        const response = await fetch({
-          ...request,
+        const response = await fetch(input, {
+          ...init,
           signal: abortController.signal,
         });
         if (response.ok) {
