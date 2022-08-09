@@ -12,7 +12,7 @@
   "license": "ISC",
   "main": "lib/index.js",
   "scripts": {
-    "start": "parcel src/index.html",
+    "watch": "parcel src/index.html",
     "build": "tsc",
     "test": "jest"
   },

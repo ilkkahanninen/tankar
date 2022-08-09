@@ -22,7 +22,8 @@
     "url": "git+https://github.com/ilkkahanninen/tankar.git"
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "watch": "tsc --watch"
   },
   "bugs": {
     "url": "https://github.com/ilkkahanninen/tankar/issues"

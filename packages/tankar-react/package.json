@@ -19,7 +19,8 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "jest"
+    "test": "jest",
+    "watch": "tsc --watch"
   },
   "peerDependencies": {
     "react": "^18.2.0"
