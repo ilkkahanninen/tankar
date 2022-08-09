@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Store, Subscriber } from "../../tankar/lib";
+import type { Store, Subscriber } from "tankar";
 
 export type Selector<T, S> = (t: T) => S;
 
